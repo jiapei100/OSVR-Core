@@ -75,6 +75,7 @@ endif()
 
 set(BUILD_JOINTCLIENTKIT OFF)
 set(BUILD_ANALYSISPLUGINKIT OFF)
+set(BUILD_RESETYAW ON)
 if(BUILD_CLIENT AND BUILD_SERVER)
     set(BUILD_JOINTCLIENTKIT ON)
     set(BUILD_ANALYSISPLUGINKIT ON)
@@ -102,9 +103,20 @@ if(BUILD_SERVER_PLUGINS AND BUILD_WITH_OPENCV)
             endif()
         endif()
     elseif(NOT ANDROID)
-        # Non-Windows desktop platforms can use the experimental OpenCV capture.
-        # TODO get alternate capture libraries, like libuvc, that let us be choosier about our input.
-        set(BUILD_VIDEOTRACKER_PLUGIN ON)
+        # Non-Windows desktop platforms can use libuvc
+        find_package(libuvc)
+        if(libuvc_INCLUDE_DIRS AND libuvc_LIBRARIES)
+            set(LIBUVC_FOUND ON)
+        else()
+            set(LIBUVC_FOUND OFF)
+        endif()
+        find_package(Libusb1)
+        if(LIBUSB1_FOUND AND LIBUVC_FOUND)
+            set(BUILD_VIDEOTRACKER_PLUGIN ON)
+        else()
+            message(STATUS "HDK video tracker plugin disabled due to missing libuvc or libusb1")
+            set(BUILD_VIDEOTRACKER_PLUGIN OFF)
+        endif()
     endif()
 endif()
 
@@ -296,6 +308,14 @@ endif()
 # interface targets for the requested libraries
 include(BoostTargets)
 
+add_library(osvr_codecvt INTERFACE)
+if(WIN32)
+    if(OSVR_HAVE_CODECVT)
+        target_compile_definitions(osvr_codecvt INTERFACE OSVR_HAVE_CODECVT)
+    else()
+        target_link_libraries(osvr_codecvt INTERFACE boost_locale)
+    endif()
+endif()
 ###
 # Set up build directories
 ###
